@@ -1,0 +1,111 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/prisma"
+  engineType    = "binary"
+}
+
+datasource db {
+  provider = "mysql"
+}
+
+model Category {
+  id          Int      @id @default(autoincrement())
+  name        String   @db.VarChar(80)
+  description String?  @db.Text
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  events Event[]
+
+  @@map("categories")
+}
+
+model Tag {
+  id   Int    @id @default(autoincrement())
+  name String @db.VarChar(50)
+
+  events Event[]
+
+  @@map("tags")
+}
+
+model RegistrationStatus {
+  id   Int    @id @default(autoincrement())
+  name String @db.VarChar(30)
+
+  registrations Registration[]
+
+  @@map("registration_statuses")
+}
+
+model UserRole {
+  id   Int    @id @default(autoincrement())
+  name String @db.VarChar(30)
+
+  users User[]
+
+  @@map("user_roles")
+}
+
+model User {
+  id        Int      @id @default(autoincrement())
+  email     String   @unique @db.VarChar(100)
+  password  String   @db.VarChar(255)
+  fullName  String   @map("full_name") @db.VarChar(120)
+  roleId    Int      @map("role_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  role          UserRole       @relation(fields: [roleId], references: [id])
+  registrations Registration[]
+
+  @@map("users")
+}
+
+model Event {
+  id            Int      @id @default(autoincrement())
+  title         String   @db.VarChar(150)
+  description   String   @db.Text
+  date          DateTime
+  location      String   @db.VarChar(150)
+  modality      String   @db.VarChar(30)
+  totalCapacity Int      @map("total_capacity")
+  isActive      Boolean  @default(true) @map("is_active")
+  imageUrl      String?  @map("image_url") @db.VarChar(255)
+
+  categoryId  Int      @map("category_id")
+  organizerId Int      @map("organizer_id")
+
+  category    Category  @relation(fields: [categoryId], references: [id])
+  organizer   Organizer @relation(fields: [organizerId], references: [id])
+  tags     Tag[]
+  registrations Registration[]
+
+  @@map("events")
+}
+
+
+model Registration {
+  eventId      Int      @map("event_id")
+  userId       Int      @map("user_id")
+  statusId     Int      @default(1) @map("status_id")
+  registeredAt DateTime @default(now()) @map("registered_at")
+
+  event  Event              @relation(fields: [eventId], references: [id])
+  user   User               @relation(fields: [userId], references: [id])
+  status RegistrationStatus @relation(fields: [statusId], references: [id])
+
+  @@id([eventId, userId])
+  @@map("registrations")
+}
+model Organizer {
+  id          Int      @id @default(autoincrement())
+  name        String   @db.VarChar(100)
+  description String?  @db.VarChar(255)
+  imageUrl    String?  @map("image_url") @db.VarChar(255)
+
+  events      Event[]
+
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@map("organizers")
+}
