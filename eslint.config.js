@@ -7,7 +7,7 @@ import importPlugin from "eslint-plugin-import";
 
 export default [
   {
-    ignores: ["dist", "node_modules"]
+    ignores: ["dist", "node_modules", "api-citas-main"]
   },
 
   js.configs.recommended,
@@ -91,8 +91,30 @@ export default [
 
   {
     files: ["vite.config.js"],
+    languageOptions: {
+      globals: {
+        ...globals.node
+      }
+    },
     rules: {
       "import/no-unresolved": "off"
+    }
+  },
+
+  {
+    files: ["scripts/**/*.mjs"],
+    languageOptions: {
+      globals: {
+        ...globals.node
+      }
+    }
+  },
+
+  {
+    files: ["src/components/ui/**/*.jsx"],
+    rules: {
+      "react/prop-types": "off",
+      "no-unused-vars": "off"
     }
   }
 ];

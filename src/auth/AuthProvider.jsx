@@ -1,14 +1,28 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import PropTypes from "prop-types"
 import { AuthContext } from "./AuthContext"
-import { getProfile, loginUser, registerUser as registerUserRequest } from "../services/authService"
+import {
+    loginUsuario,
+    obtenerPerfil,
+    registrarCliente,
+} from "@/services/authService"
+import { setStoredToken, getStoredToken } from "@/lib/http"
 
-const TOKEN_KEY = "token"
-
+/**
+ * Proveedor de sesión de la app. Orquesta todo el ciclo de vida de la autenticación:
+ *
+ * - Login/registro contra el API y perfil del usuario (GET /usuarios/perfil),
+ *   que trae `rol: { nombre }` y `empleado: { id } | null` (clave para permisos y agenda).
+ * - Persistencia del token en localStorage (clave "token") para restaurar
+ *   la sesión al recargar la página.
+ * - Expone helpers derivados: rol, empleadoId y hasRole() para los guardias de ruta.
+ */
 export function AuthProvider({ children }) {
     const [user, setUser] = useState(null)
     const [token, setToken] = useState(null)
     const [loading, setLoading] = useState(true)
+    // Ref para saber si el componente sigue montado; evita hacer setState
+    // después del desmonte cuando hay promesas en vuelo (típico warning/carrera async).
     const isMounted = useRef(true)
 
     const isAuthenticated = Boolean(token && user)
@@ -20,69 +34,101 @@ export function AuthProvider({ children }) {
         }
     }, [])
 
+    // Limpia token (localStorage) y estado en memoria. Se usa en logout
+    // y cuando la sesión restaurada resulta inválida.
     const clearSession = useCallback(() => {
-        localStorage.removeItem(TOKEN_KEY)
+        setStoredToken(null)
         if (isMounted.current) {
             setToken(null)
             setUser(null)
         }
     }, [])
 
-    const login = useCallback(async (email, password) => {
-        const newToken = await loginUser(email, password)
-        const profile = await getProfile(newToken)
-        localStorage.setItem(TOKEN_KEY, newToken)
-        if (isMounted.current) {
-            setToken(newToken)
-            setUser(profile)
+    /**
+     * Inicia sesión: obtiene el token y el perfil del usuario.
+     * El perfil incluye `rol` (objeto) y `empleado` (ficha o null),
+     * necesarios para la matriz de permisos por rol.
+     */
+    const login = useCallback(async (correo, password) => {
+        const { token: newToken } = await loginUsuario(correo, password)
+        // IMPORTANTE: guardar el token en localStorage ANTES de pedir el perfil,
+        // porque http.js arma el header Bearer leyendo de localStorage. Si se
+        // guarda después, /usuarios/perfil saldría sin Authorization y el API
+        // respondería 401 "Token no proporcionado".
+        setStoredToken(newToken)
+        try {
+            const perfil = await obtenerPerfil()
+            if (isMounted.current) {
+                setToken(newToken)
+                setUser(perfil)
+            }
+            return perfil
+        } catch (e) {
+            // Si el perfil falla con el token recién emitido, no dejamos
+            // un token colgado en localStorage: limpiamos y propagamos.
+            setStoredToken(null)
+            throw e
         }
-        return profile
     }, [])
 
+    // Registro público: solo crea la cuenta de Cliente; NO inicia sesión,
+    // el usuario pasa luego por el login.
     const registerUser = useCallback(async (userData) => {
-        return await registerUserRequest(userData)
+        return await registrarCliente(userData)
     }, [])
 
     const logout = useCallback(() => {
         clearSession()
     }, [clearSession])
 
-    const hasRole = useCallback((allowedRoles) => {
-        return Boolean(user?.role?.name && allowedRoles.includes(user.role.name))
-    }, [user])
+    // Matriz de permisos en miniatura: ¿el rol actual está entre los permitidos?
+    // La consumen los <RoleRoute> de cada ruta protegida.
+    const hasRole = useCallback(
+        (allowedRoles) => {
+            const rolNombre = user?.rol?.nombre
+            return Boolean(rolNombre && allowedRoles.includes(rolNombre))
+        },
+        [user]
+    )
 
+    // Al montar: si hay token guardado en localStorage, intentamos recuperar
+    // la sesión pidiendo el perfil. Si el token ya no es válido, limpiamos.
     useEffect(() => {
         async function restoreSession() {
-            const savedToken = localStorage.getItem(TOKEN_KEY)
+            const savedToken = getStoredToken()
             if (!savedToken) {
-                if (isMounted.current) {
-                    setLoading(false)
-                }
+                if (isMounted.current) setLoading(false)
                 return
             }
             try {
-                const profile = await getProfile(savedToken)
+                // Set optimista del token para que http lo adjunte
+                // en la llamada a obtenerPerfil() de abajo.
+                setToken(savedToken)
+                const perfil = await obtenerPerfil()
                 if (isMounted.current) {
+                    setUser(perfil)
                     setToken(savedToken)
-                    setUser(profile)
                 }
             } catch {
+                // Token inválido/vencido → sesión muerta.
                 clearSession()
             } finally {
-                if (isMounted.current) {
-                    setLoading(false)
-                }
+                if (isMounted.current) setLoading(false)
             }
         }
         restoreSession()
     }, [clearSession])
 
+    // Valor del contexto memoizado: mientras no cambie la sesión,
+    // los consumidores no se re-renderizan sin motivo.
     const value = useMemo(
         () => ({
             user,
             token,
             loading,
             isAuthenticated,
+            rol: user?.rol?.nombre ?? null,
+            empleadoId: user?.empleado?.id ?? null,
             login,
             logout,
             registerUser,

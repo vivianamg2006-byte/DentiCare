@@ -1,4 +1,12 @@
 import { Badge } from "@/components/ui/badge";
+import PropTypes from "prop-types";
+/**
+ * Encabezado estándar de página: título grande + descripción.
+ * Tiene dos modos según `isBadge`:
+ *   - false (default): la descripción se muestra como párrafo bajo el título.
+ *   - true: la descripción se muestra como Badge junto al título
+ *     (útil para etiquetas cortas tipo "Nuevo" o el nombre de una entidad).
+ */
 export function PageHeader({ title, description, isBadge = false }) {
     return (
         <div className="mb-10 space-y-2">
@@ -23,3 +31,9 @@ export function PageHeader({ title, description, isBadge = false }) {
         </div>
     );
 }
+
+PageHeader.propTypes = {
+    title: PropTypes.string.isRequired,
+    description: PropTypes.string,
+    isBadge: PropTypes.bool,
+};

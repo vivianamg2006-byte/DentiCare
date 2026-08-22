@@ -2,6 +2,14 @@ import { ShieldAlert } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Link } from "react-router-dom"
 
+/**
+ * Página de acceso no autorizado (403).
+ *
+ * Se muestra cuando un usuario autenticado intenta entrar a una ruta
+ * cuyo rol no le corresponde (ver RoleRoute). Ofrece volver al inicio.
+ *
+ * @component
+ */
 export function UnauthorizedPage() {
     return (
         <section className="mx-auto flex max-w-md flex-col items-center gap-4 py-16 text-center">
@@ -15,7 +23,7 @@ export function UnauthorizedPage() {
                 No posee los permisos suficientes para acceder al recurso solicitado.
             </p>
             <Button asChild>
-                <Link to="/events">Volver al inicio</Link>
+                <Link to="/">Volver al inicio</Link>
             </Button>
         </section>
     )
