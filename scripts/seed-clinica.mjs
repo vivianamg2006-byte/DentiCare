@@ -386,11 +386,16 @@ async function main() {
     })
     console.log("✓ Restricciones de horario registradas")
 
-    /* 8. Citas */
+   /* 8. Citas */
     const estadosCita = await api("/estados-cita")
     const estadoPorNombre = new Map(estadosCita.map((e) => [e.nombre, e]))
     const especialistasPlan = ESPECIALISTAS.map((e) => empleadoPorCodigo.get(e.codigoEmpleado))
     const adicionalesDemo = [...adicionalPorNombre.values()].slice(0, 2)
+    const citasExistentes = await api("/citas")
+    const existeCita = (empleadoId, fecha, horaInicio) =>
+        citasExistentes.some(
+            (c) => c.empleadoId === empleadoId && c.fecha === fecha && c.horaInicio === horaInicio
+        )
 
     const contador = { Pendiente: 0, Confirmada: 0, Finalizada: 0, Cancelada: 0 }
     const MOTIVOS = MOTIVOS_CANCELACION
@@ -401,6 +406,11 @@ async function main() {
         const servicio = servicioPorNombre.get(nombreServicio)
         const paciente = pacientePorIndice[idxPaciente]
         const fecha = fechaEn(offsetDias)
+
+        if (existeCita(empleado.id, fecha, hora)) {
+            contador[estadoFinal]++
+            continue
+        }
 
         const conAdicionales = i % 3 === 1 // cada tercera cita lleva 2 adicionales
         const adicionalesCita = conAdicionales ? adicionalesDemo : []
