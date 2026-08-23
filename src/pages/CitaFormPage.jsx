@@ -76,16 +76,17 @@ export function CitaFormPage({ modo }) {
     const [cargandoAgenda, setCargandoAgenda] = useState(false)
     const [errorCarga, setErrorCarga] = useState(null)
 
-    const {
-        register,
-        handleSubmit,
-        control,
-        watch,
-        setValue,
-        reset,
-        trigger,
-        formState: { errors },
-    } = useForm({
+ const {
+    register,
+    handleSubmit,
+    control,
+    watch,
+    setValue,
+    getValues,
+    reset,
+    trigger,
+    formState: { errors },
+} = useForm({
         resolver: zodResolver(citaFormSchema),
         defaultValues: {
             clienteId: "",
@@ -162,13 +163,15 @@ export function CitaFormPage({ modo }) {
                 const lista = await listarEmpleadosActivos(servicioIdActual)
                 if (!activo) return
                 setEspecialistas(lista)
-                // Si el especialista actual ya no puede atender el servicio, se limpia
-                setValue("empleadoId", (valorActual) => {
-                    const sigueValido = lista.some(
-                        (e) => String(e.id) === valorActual
-                    )
-                    return sigueValido ? valorActual : ""
-                })
+// Si el especialista actual ya no puede atender el servicio, se limpia.
+// OJO: setValue de react-hook-form NO admite una función
+// "actualizadora" como el setState de React; hay que calcular
+// el valor primero y pasarlo ya resuelto.
+                const valorActual = getValues("empleadoId")
+                const sigueValido = lista.some((e) => String(e.id) === valorActual)
+                if (!sigueValido) {
+                setValue("empleadoId", "")
+                }
             } catch (e) {
                 if (activo) toast.error(e.message || "No se pudieron cargar los especialistas.")
             }
@@ -177,7 +180,7 @@ export function CitaFormPage({ modo }) {
         return () => {
             activo = false
         }
-    }, [servicioIdActual, setValue])
+    }, [servicioIdActual, setValue, getValues])
 
     /* ---------- Agenda del especialista para la fecha elegida ---------- */
     const cargarAgenda = useCallback(async () => {
@@ -212,7 +215,7 @@ export function CitaFormPage({ modo }) {
         [adicionales, adicionalesSeleccionados]
     )
 
-    const precioServicio = servicioSeleccionado?.precioBase ?? 0
+    const precioServicio = Number(servicioSeleccionado?.precioBase ?? 0)
     const costoAdicionales = useMemo(
         () => adicionalesElegidos.reduce((total, a) => total + Number(a.precio), 0),
         [adicionalesElegidos]
