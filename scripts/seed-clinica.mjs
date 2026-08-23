@@ -89,8 +89,11 @@ const SERVICIOS = [
     // Ortodoncia
     { nombre: "Ajuste de brackets", especialidad: "Ortodoncia", precioBase: 15000, duracionMinutos: 30, descripcion: "Control mensual del tratamiento ortodóntico con cambio de ligas y ajustes de fuerza." },
     { nombre: "Instalación de frenos metálicos", especialidad: "Ortodoncia", precioBase: 250000, duracionMinutos: 90, descripcion: "Colocación completa del aparato ortodóntico metálico con indicaciones de cuidado." },
+    { nombre: "Retiro de brackets y retenedor", especialidad: "Ortodoncia", precioBase: 45000, duracionMinutos: 45, descripcion: "Remoción del aparato ortodóntico y colocación de retenedor de contención." },
     // Estética Dental
     { nombre: "Blanqueamiento dental", especialidad: "Estética Dental", precioBase: 65000, duracionMinutos: 60, descripcion: "Aclarado profesional de los dientes en una sesión con lámpara de luz LED." },
+    { nombre: "Carillas de resina", especialidad: "Estética Dental", precioBase: 55000, duracionMinutos: 60, descripcion: "Cobertura estética del diente con resina compuesta para mejorar forma y color." },
+    { nombre: "Diseño de sonrisa", especialidad: "Estética Dental", precioBase: 95000, duracionMinutos: 60, descripcion: "Evaluación y plan integral para armonizar la estética dental del paciente." },
     // Odontopediatría
     { nombre: "Aplicación de flúor", especialidad: "Odontopediatría", precioBase: 10000, duracionMinutos: 30, descripcion: "Aplicación tópica de flúor para fortalecer el esmalte y prevenir caries en los más pequeños." },
     { nombre: "Consulta odontopediátrica", especialidad: "Odontopediatría", precioBase: 9000, duracionMinutos: 30, descripcion: "Primera valoración dental infantil con técnicas de manejo conductual amigables." },
@@ -125,14 +128,14 @@ const ESPECIALISTAS = [
         correoUsuario: "fernanda.solis@dentcare.com",
         especialidad: "Ortodoncia",
         descripcion: "Ortodoncista certificada en frenos metálicos y estética de la sonrisa.",
-        servicios: ["Ajuste de brackets", "Instalación de frenos metálicos", "Blanqueamiento dental"],
+        servicios: ["Ajuste de brackets", "Instalación de frenos metálicos", "Retiro de brackets y retenedor"],
     },
     {
         codigoEmpleado: "HIG-001",
         correoUsuario: "sofia.herrera@dentcare.com",
         especialidad: "Estética Dental",
         descripcion: "Higienista dental enfocada en prevención, profilaxis y educación de higiene oral.",
-        servicios: ["Limpieza dental (profilaxis)", "Aplicación de flúor", "Blanqueamiento dental"],
+        servicios: ["Blanqueamiento dental", "Carillas de resina", "Diseño de sonrisa"],
     },
 ]
 
@@ -149,13 +152,11 @@ const CITAS_PLAN = [
     ["Pendiente", 0, "Resina/Obturación", 1, 2, "14:00"],
     ["Confirmada", 0, "Consulta y diagnóstico", 0, 3, "08:30"],
     ["Confirmada", 1, "Instalación de frenos metálicos", 1, 4, "09:00"],
-    ["Confirmada", 2, "Limpieza dental (profilaxis)", 1, 5, "10:00"],
+    ["Confirmada", 2, "Carillas de resina", 1, 5, "10:00"],
     ["Confirmada", 0, "Corona dental", 0, 6, "11:00"],
     ["Finalizada", 0, "Consulta y diagnóstico", 0, 7, "09:00"],
-    ["Finalizada", 2, "Aplicación de flúor", 1, 8, "08:30"],
+    ["Finalizada", 2, "Diseño de sonrisa", 1, 8, "08:30"],
     ["Finalizada", 1, "Ajuste de brackets", 0, 9, "15:00"],
-    ["Cancelada", 0, "Consulta y diagnóstico", 1, 10, "16:00"],
-    ["Cancelada", 1, "Blanqueamiento dental", 0, 11, "13:00"],
 ]
 
 const MOTIVOS_CANCELACION = [
@@ -172,7 +173,9 @@ async function main() {
         cuerpo: { correo: "admin@citas.com", password: "Admin12345" },
     })
     token = login.token
-    console.log("✓ Sesión iniciada como administrador")
+    const perfilAdmin = await api("/usuarios/perfil")
+    const adminId = perfilAdmin.id
+    console.log("✓ Sesión iniciada como administrador") 
 
     /* 2. Pacientes (registro público; ignora duplicados) */
     await intentar(
@@ -300,7 +303,7 @@ async function main() {
         if (existe) continue
         await api("/horarios-atencion", {
             metodo: "POST",
-            cuerpo: { diaSemanaId: dia.id, horaInicio: horario.horaInicio, horaFin: horario.horaFin, activo: true },
+            cuerpo: { diaSemanaId: dia.id, horaInicio: horario.horaInicio, horaFin: horario.horaFin },
         })
     }
     console.log("✓ Horarios de atención configurados (lunes a sábado)")
@@ -442,7 +445,7 @@ async function main() {
             cuerpo: {
                 ...cuerpoBase,
                 estadoCitaId: estadoPorNombre.get("Pendiente").id,
-                creadoPorUsuarioId: 1,
+                creadoPorUsuarioId: adminId,
             },
         })
 
