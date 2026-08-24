@@ -31,6 +31,7 @@ import {
     formatCurrency,
     formatDuracion,
     formatFecha,
+    formatHora,
     nombreCompleto,
 } from "@/lib/format"
 
@@ -108,7 +109,7 @@ export function CitaDetailPage() {
             <div className="flex flex-wrap items-start justify-between gap-4">
                 <PageHeader
                     title={`Cita #${cita.id}`}
-                    description={`${formatFecha(cita.fecha)} · ${cita.horaInicio} – ${cita.horaFin}`}
+                    description={`${formatFecha(cita.fecha)} · ${formatHora(cita.horaInicio)} – ${formatHora(cita.horaFin)}`}
                 />
                 <EstadoBadge estado={cita.estadoCita} />
             </div>

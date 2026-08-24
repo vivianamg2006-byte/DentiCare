@@ -76,28 +76,33 @@ export function RegisterPage() {
                     </CardDescription>
                 </CardHeader>
                 <form onSubmit={handleSubmit(onSubmit)} noValidate>
-                    <CardContent className="grid gap-4 sm:grid-cols-2">
-                        <div className="grid gap-2">
-                            <Label htmlFor="nombre">Nombre *</Label>
-                            <Input id="nombre" placeholder="María" {...register("nombre")} />
-                            <FormError message={errors.nombre?.message} />
+                    <CardContent className="grid gap-5">
+                        {/* Datos personales: dos columnas simétricas en pantallas sm+ */}
+                        <div className="grid gap-4 sm:grid-cols-2">
+                            <div className="grid gap-2">
+                                <Label htmlFor="nombre">Nombre *</Label>
+                                <Input id="nombre" placeholder="María" {...register("nombre")} />
+                                <FormError message={errors.nombre?.message} />
+                            </div>
+                            <div className="grid gap-2">
+                                <Label htmlFor="primerApellido">Primer apellido *</Label>
+                                <Input id="primerApellido" placeholder="López" {...register("primerApellido")} />
+                                <FormError message={errors.primerApellido?.message} />
+                            </div>
+                            <div className="grid gap-2">
+                                <Label htmlFor="segundoApellido">Segundo apellido (opcional)</Label>
+                                <Input id="segundoApellido" placeholder="Rojas" {...register("segundoApellido")} />
+                                <FormError message={errors.segundoApellido?.message} />
+                            </div>
+                            <div className="grid gap-2">
+                                <Label htmlFor="telefono">Teléfono (opcional)</Label>
+                                <Input id="telefono" placeholder="8888-8888" {...register("telefono")} />
+                                <FormError message={errors.telefono?.message} />
+                            </div>
                         </div>
+
+                        {/* Correo a lo ancho del formulario */}
                         <div className="grid gap-2">
-                            <Label htmlFor="primerApellido">Primer apellido *</Label>
-                            <Input id="primerApellido" placeholder="López" {...register("primerApellido")} />
-                            <FormError message={errors.primerApellido?.message} />
-                        </div>
-                        <div className="grid gap-2">
-                            <Label htmlFor="segundoApellido">Segundo apellido (opcional)</Label>
-                            <Input id="segundoApellido" placeholder="Rojas" {...register("segundoApellido")} />
-                            <FormError message={errors.segundoApellido?.message} />
-                        </div>
-                        <div className="grid gap-2">
-                            <Label htmlFor="telefono">Teléfono (opcional)</Label>
-                            <Input id="telefono" placeholder="8888-8888" {...register("telefono")} />
-                            <FormError message={errors.telefono?.message} />
-                        </div>
-                        <div className="grid gap-2 sm:col-span-2">
                             <Label htmlFor="correo">Correo electrónico *</Label>
                             <Input
                                 id="correo"
@@ -108,28 +113,38 @@ export function RegisterPage() {
                             />
                             <FormError message={errors.correo?.message} />
                         </div>
-                        <div className="grid gap-2">
-                            <Label htmlFor="password">Contraseña *</Label>
-                            <Input
-                                id="password"
-                                type="password"
-                                autoComplete="new-password"
-                                {...register("password")}
-                            />
+
+                        {/* Credenciales: ambas celdas con estructura idéntica
+                            (etiqueta + input + error) para que queden alineadas;
+                            la nota de requisitos es compartida y vive fuera de
+                            las columnas, así ningún campo queda más alto que otro. */}
+                        <div className="grid gap-3 rounded-lg border border-border/70 bg-muted/30 p-4">
+                            <div className="grid gap-4 sm:grid-cols-2">
+                                <div className="grid content-start gap-2">
+                                    <Label htmlFor="password">Contraseña *</Label>
+                                    <Input
+                                        id="password"
+                                        type="password"
+                                        autoComplete="new-password"
+                                        {...register("password")}
+                                    />
+                                    <FormError message={errors.password?.message} />
+                                </div>
+                                <div className="grid content-start gap-2">
+                                    <Label htmlFor="confirmPassword">Confirmar contraseña *</Label>
+                                    <Input
+                                        id="confirmPassword"
+                                        type="password"
+                                        autoComplete="new-password"
+                                        {...register("confirmPassword")}
+                                    />
+                                    <FormError message={errors.confirmPassword?.message} />
+                                </div>
+                            </div>
                             <p className="text-xs text-muted-foreground">
-                                Mínimo 8 caracteres, con mayúscula, minúscula y un número.
+                                La contraseña debe tener mínimo 8 caracteres, incluyendo al menos
+                                una letra mayúscula, una minúscula y un número.
                             </p>
-                            <FormError message={errors.password?.message} />
-                        </div>
-                        <div className="grid gap-2">
-                            <Label htmlFor="confirmPassword">Confirmar contraseña *</Label>
-                            <Input
-                                id="confirmPassword"
-                                type="password"
-                                autoComplete="new-password"
-                                {...register("confirmPassword")}
-                            />
-                            <FormError message={errors.confirmPassword?.message} />
                         </div>
                     </CardContent>
                     <CardFooter className="flex flex-col gap-3">

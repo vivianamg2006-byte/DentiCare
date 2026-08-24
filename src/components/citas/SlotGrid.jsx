@@ -2,13 +2,14 @@ import { useMemo } from "react"
 import PropTypes from "prop-types"
 import { Ban } from "lucide-react"
 import { cn } from "@/lib/utils"
-import { horaAMinutos, minutosAHora, hoyISO } from "@/lib/format"
+import {
+    horaAMinutos,
+    minutosAHora,
+    hoyISO,
+    rangosSeTraslapan,
+} from "@/lib/format"
 
 const PASO_MINUTOS = 30
-
-function seTraslapan(inicioA, finA, inicioB, finB) {
-    return inicioA < finB && inicioB < finA
-}
 
 /**
  * Cuadrícula de bloques de 30 minutos para elegir la hora de
@@ -31,6 +32,12 @@ export function SlotGrid({
     onChange,
 }) {
     const slots = useMemo(() => {
+        // Minutos actuales solo si la fecha consultada es hoy (para bloquear el pasado)
+        const esHoy = fecha === hoyISO()
+        const minutosAhora = esHoy
+            ? new Date().getHours() * 60 + new Date().getMinutes()
+            : Infinity
+
         const lista = []
         for (const horario of horarios) {
             const inicioJornada = horaAMinutos(horario.horaInicio)
@@ -43,12 +50,12 @@ export function SlotGrid({
                 const inicio = minutosAHora(minutos)
                 const fin = minutosAHora(minutos + duracionMinutos)
 
-                const citaQueTraslapa = citas.find(
-                    (c) => seTraslapan(inicio, fin, c.horaInicio, c.horaFin)
+                const citaQueTraslapa = citas.find((c) =>
+                    rangosSeTraslapan(inicio, fin, c.horaInicio, c.horaFin)
                 )
                 const restriccionQueTraslapa = restricciones.find((r) => {
                     if (r.todoElDia) return true
-                    return seTraslapan(inicio, fin, r.horaInicio, r.horaFin)
+                    return rangosSeTraslapan(inicio, fin, r.horaInicio, r.horaFin)
                 })
 
                 let estado = "disponible"
@@ -56,8 +63,8 @@ export function SlotGrid({
                 else if (restriccionQueTraslapa) estado = "bloqueado"
 
                 // Bloques que ya pasaron hoy no son seleccionables
-                if (fecha === hoyISO() && minutos <= new Date().getHours() * 60 + new Date().getMinutes()) {
-                    if (estado === "disponible") estado = "pasado"
+                if (esHoy && minutos <= minutosAhora && estado === "disponible") {
+                    estado = "pasado"
                 }
 
                 lista.push({ inicio, fin, estado })

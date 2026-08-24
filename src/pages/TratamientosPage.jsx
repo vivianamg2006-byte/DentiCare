@@ -14,6 +14,7 @@ import { useAuth } from "@/auth/useAuth"
 import { listarServicios } from "@/services/serviciosService"
 import { urlImagen } from "@/services/imagesService"
 import { formatCurrency, formatDuracion } from "@/lib/format"
+import { imagenTratamiento } from "@/lib/imagenesTratamientos"
 
 /**
  * Catálogo público de tratamientos dentales.
@@ -117,13 +118,16 @@ export function TratamientosPage() {
             )}
             {!cargando && !error && filtrados.length > 0 && (
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                    {filtrados.map((servicio) => (
+                    {filtrados.map((servicio) => {
+                        // Prioriza la imagen local por nombre; si no hay, usa la del API
+                        const imagen = imagenTratamiento(servicio.nombre) ?? urlImagen(servicio.imagen)
+                        return (
                         <Link key={servicio.id} to={`/tratamientos/${servicio.id}`} className="group">
                             <Card className="h-full overflow-hidden pt-0 transition-shadow group-hover:shadow-md">
-                                <div className="flex h-36 items-center justify-center overflow-hidden border-b border-border bg-muted/40">
-                                    {urlImagen(servicio.imagen) ? (
+                                <div className="flex aspect-video items-center justify-center overflow-hidden border-b border-border bg-muted/40">
+                                    {imagen ? (
                                         <img
-                                            src={urlImagen(servicio.imagen)}
+                                            src={imagen}
                                             alt={servicio.nombre}
                                             className="h-full w-full object-cover transition-transform group-hover:scale-105"
                                         />
@@ -157,7 +161,8 @@ export function TratamientosPage() {
                                 </CardContent>
                             </Card>
                         </Link>
-                    ))}
+                        )
+                    })}
                 </div>
             )}
         </section>

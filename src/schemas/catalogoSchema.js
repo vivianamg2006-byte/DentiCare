@@ -34,6 +34,7 @@ export const servicioSchema = z.object({
         .min(15, "La duración mínima es de 15 minutos.")
         .max(480, "La duración no puede superar 8 horas (480 minutos)."),
     especialidadId: idSchema,
+    imagen: z.string().trim().min(1, "La imagen es obligatoria."),
 })
 
 /**

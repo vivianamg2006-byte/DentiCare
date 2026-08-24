@@ -78,7 +78,7 @@ export function ImageUpload({ value, previewUrl, onChange, onError, disabled }) 
                     <ImagePlus className="h-8 w-8 text-muted-foreground" />
                     <span>Seleccionar imagen</span>
                     <span className="text-xs font-normal text-muted-foreground">
-                        JPG, PNG o WEBP · máx. 5 MB {value ? "(imagen actual guardada)" : "(opcional)"}
+                        JPG, PNG o WEBP · máx. 5 MB {value ? "(imagen actual guardada)" : "(obligatoria)"}
                     </span>
                 </Button>
             )}

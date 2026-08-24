@@ -43,7 +43,7 @@ import { subirImagen } from "@/services/imagesService"
  * Componente dual: la prop `modo` decide si crea un tratamiento nuevo o
  * edita uno existente (carga sus datos por id). Valida con servicioSchema
  * (precio > 0 hasta 99999999.99 en colones, duración entre 15 y 480 min).
- * La imagen es opcional: si se sube un archivo nuevo se envía como
+ * La imagen es obligatoria: si se sube un archivo nuevo se envía como
  * multipart al endpoint de imágenes (campo "image") y al tratamiento se
  * le asigna el fileName devuelto; en edición se conserva el anterior.
  *
@@ -71,6 +71,7 @@ export function TratamientoFormPage({ modo }) {
         handleSubmit,
         control,
         reset,
+        setValue,
         formState: { errors },
     } = useForm({
         resolver: zodResolver(servicioSchema),
@@ -80,6 +81,7 @@ export function TratamientoFormPage({ modo }) {
             precioBase: "",
             duracionMinutos: "",
             especialidadId: "",
+            imagen: "",
         },
     })
 
@@ -103,6 +105,7 @@ export function TratamientoFormPage({ modo }) {
                         precioBase: String(servicio.precioBase),
                         duracionMinutos: String(servicio.duracionMinutos),
                         especialidadId: String(servicio.especialidadId),
+                        imagen: servicio.imagen ?? "",
                     })
                     setImagenActual(servicio.imagen ?? null)
                 }
@@ -120,6 +123,12 @@ export function TratamientoFormPage({ modo }) {
 
     async function onSubmit(data) {
         setErrorImagen("")
+        // El enunciado exige imagen representativa obligatoria: sin archivo
+        // nuevo y sin imagen previa guardada no se permite guardar.
+        if (!archivoNuevo && !imagenActual) {
+            setErrorImagen("La imagen es obligatoria.")
+            return
+        }
         setEnviando(true)
         try {
             // 1) Si hay archivo nuevo, subirlo primero y usar el fileName recibido
@@ -159,6 +168,9 @@ export function TratamientoFormPage({ modo }) {
     function handleImagenChange({ archivo, vistaPrevia: preview }) {
         setArchivoNuevo(archivo)
         setVistaPrevia(preview)
+        // El schema exige un string no vacío en "imagen": en creación lo
+        // aporta el archivo recién elegido; quitarlo vuelve a bloquear.
+        setValue("imagen", archivo ? archivo.name : "", { shouldValidate: true })
     }
 
     if (cargandoDatos) {
@@ -254,7 +266,7 @@ export function TratamientoFormPage({ modo }) {
                         </div>
 
                         <div className="grid gap-2">
-                            <Label>Imagen</Label>
+                            <Label>Imagen *</Label>
                             <ImageUpload
                                 value={imagenActual}
                                 previewUrl={
@@ -269,6 +281,7 @@ export function TratamientoFormPage({ modo }) {
                                 onError={setErrorImagen}
                                 disabled={enviando}
                             />
+                            <FormError message={errors.imagen?.message} />
                             {errorImagen && <FormError message={errorImagen} />}
                         </div>
 

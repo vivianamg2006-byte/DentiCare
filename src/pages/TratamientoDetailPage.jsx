@@ -17,6 +17,7 @@ import { useAuth } from "@/auth/useAuth"
 import { obtenerServicio, cambiarEstadoServicio } from "@/services/serviciosService"
 import { urlImagen } from "@/services/imagesService"
 import { formatCurrency, formatDuracion } from "@/lib/format"
+import { imagenTratamiento } from "@/lib/imagenesTratamientos"
 
 /**
  * Detalle de un tratamiento del catálogo.
@@ -85,15 +86,18 @@ export function TratamientoDetailPage() {
     if (error) return <ErrorState message={error} onRetry={cargar} />
     if (!servicio) return null
 
+    // Prioriza la imagen local por nombre; si no hay, usa la del API
+    const imagen = imagenTratamiento(servicio.nombre) ?? urlImagen(servicio.imagen)
+
     return (
         <section className="mx-auto max-w-3xl space-y-6">
             <PageHeader title={servicio.nombre} description={servicio.especialidad?.nombre} />
 
             <Card className="overflow-hidden pt-0">
-                <div className="flex h-72 items-center justify-center border-b border-border bg-muted/40">
-                    {urlImagen(servicio.imagen) ? (
+                <div className="flex aspect-video items-center justify-center border-b border-border bg-muted/40">
+                    {imagen ? (
                         <img
-                            src={urlImagen(servicio.imagen)}
+                            src={imagen}
                             alt={servicio.nombre}
                             className="h-full w-full object-cover"
                         />

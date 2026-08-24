@@ -68,6 +68,7 @@ export function CitaFormPage({ modo }) {
 
     // Dependencias del formulario
     const [especialistas, setEspecialistas] = useState([])
+    const [cargandoEspecialistas, setCargandoEspecialistas] = useState(false)
     const [agenda, setAgenda] = useState(null)
     const [adicionalesSeleccionados, setAdicionalesSeleccionados] = useState([])
     const [errorDisponibilidad, setErrorDisponibilidad] = useState("")
@@ -103,6 +104,7 @@ export function CitaFormPage({ modo }) {
     const empleadoIdActual = watch("empleadoId")
     const fechaActual = watch("fecha")
     const horaInicioActual = watch("horaInicio")
+    const horaFinActual = watch("horaFin")
 
     /* ---------- Carga inicial ---------- */
     useEffect(() => {
@@ -159,6 +161,7 @@ export function CitaFormPage({ modo }) {
         }
         let activo = true
         async function cargarEspecialistas() {
+            setCargandoEspecialistas(true)
             try {
                 const lista = await listarEmpleadosActivos(servicioIdActual)
                 if (!activo) return
@@ -174,6 +177,8 @@ export function CitaFormPage({ modo }) {
                 }
             } catch (e) {
                 if (activo) toast.error(e.message || "No se pudieron cargar los especialistas.")
+            } finally {
+                if (activo) setCargandoEspecialistas(false)
             }
         }
         cargarEspecialistas()
@@ -255,6 +260,9 @@ export function CitaFormPage({ modo }) {
             if (!resultado.disponible) {
                 setErrorDisponibilidad(resultado.motivo || "El horario seleccionado no está disponible.")
                 toast.error(resultado.motivo || "El horario seleccionado no está disponible.")
+                // El bloque pudo ser tomado mientras el usuario decidía:
+                // se refresca la grilla para mostrar el estado real del día.
+                await cargarAgenda()
                 return
             }
 
@@ -276,16 +284,18 @@ export function CitaFormPage({ modo }) {
             if (esEdicion) {
                 await actualizarCita(id, datosComunes)
                 toast.success("Cita actualizada correctamente.")
+                navigate(`/citas/${id}`)
             } else {
                 const estadoPendiente = estados.find((e) => e.nombre === "Pendiente")
-                await crearCita({
+                const creada = await crearCita({
                     ...datosComunes,
                     estadoCitaId: estadoPendiente?.id ?? 1,
                     creadoPorUsuarioId: user.id,
                 })
                 toast.success("Cita registrada correctamente.")
+                // Confirmación inmediata: el detalle muestra todos los datos guardados
+                navigate(`/citas/${creada.id}`)
             }
-            navigate("/citas")
         } catch (e) {
             toast.error(e.message || "No se pudo guardar la cita.")
         } finally {
@@ -353,7 +363,17 @@ export function CitaFormPage({ modo }) {
                                 control={control}
                                 name="servicioId"
                                 render={({ field }) => (
-                                    <Select value={String(field.value ?? "")} onValueChange={field.onChange}>
+                                    <Select
+                                        value={String(field.value ?? "")}
+                                        onValueChange={(valor) => {
+                                            field.onChange(valor)
+                                            // La duración depende del tratamiento: si cambia,
+                                            // el bloque elegido puede ya no caber o traslapar.
+                                            setValue("horaInicio", "")
+                                            setValue("horaFin", "")
+                                            setErrorDisponibilidad("")
+                                        }}
+                                    >
                                         <SelectTrigger className="w-full">
                                             <SelectValue placeholder="Seleccione el tratamiento…" />
                                         </SelectTrigger>
@@ -494,6 +514,12 @@ export function CitaFormPage({ modo }) {
                                     )}
                                 />
                                 <FormError message={errors.empleadoId?.message} />
+                                {servicioIdActual && !cargandoEspecialistas && especialistas.length === 0 && (
+                                    <p className="text-xs text-muted-foreground">
+                                        No hay especialistas activos que puedan atender este tratamiento.
+                                        Seleccione otro o contacte a la administración.
+                                    </p>
+                                )}
                             </div>
 
                             <div className="grid gap-2">
@@ -531,6 +557,10 @@ export function CitaFormPage({ modo }) {
                                     </p>
                                 ) : !fechaActual ? (
                                     <p className="text-sm text-muted-foreground">Seleccione una fecha.</p>
+                                ) : !servicioSeleccionado ? (
+                                    <p className="text-sm text-muted-foreground">
+                                        Seleccione un tratamiento: la duración de cada bloque depende de él.
+                                    </p>
                                 ) : cargandoAgenda ? (
                                     <div className="h-24 animate-pulse rounded-lg bg-muted" />
                                 ) : agenda ? (
@@ -566,7 +596,7 @@ export function CitaFormPage({ modo }) {
                                     </div>
                                     <div className="grid gap-2">
                                         <Label htmlFor="horaFin">Hora de fin (automática)</Label>
-                                        <Input id="horaFin" readOnly value={watch("horaFin") || ""} placeholder="—" />
+                                        <Input id="horaFin" readOnly value={horaFinActual || ""} placeholder="—" />
                                         <FormError message={errors.horaFin?.message} />
                                     </div>
                                 </div>

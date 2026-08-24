@@ -24,8 +24,8 @@ import { loginSchema } from "@/schemas/loginSchema"
  *
  * Valida las credenciales con el schema Zod, delega la autenticación al
  * contexto (AuthProvider) y redirige: si el usuario ya está logueado va
- * a /citas; tras un login exitoso vuelve a la ruta que intentaba visitar
- * o cae por defecto en /citas.
+ * a la pantalla de inicio; tras un login exitoso vuelve a la ruta que
+ * intentaba visitar (si llegó desde un guardia) o cae por defecto en /.
  *
  * @component
  */
@@ -42,15 +42,16 @@ export function LoginPage() {
 
     // Si ya hay sesión activa, no tiene sentido mostrar el formulario
     if (!loading && isAuthenticated) {
-        return <Navigate to="/citas" replace />
+        return <Navigate to="/" replace />
     }
 
     async function onSubmit(data) {
         try {
             await login(data.correo, data.password)
             toast.success("Inicio de sesión correcto.")
-            // Vuelve a la ruta protegida que originó el login; si no existe, va a /citas
-            const destino = location.state?.from?.pathname || "/citas"
+            // Vuelve a la ruta protegida que originó el login; si no existe,
+            // siempre cae en la pantalla de inicio.
+            const destino = location.state?.from?.pathname || "/"
             navigate(destino, { replace: true })
         } catch (error) {
             toast.error(error.message || "No se pudo iniciar sesión.")

@@ -157,6 +157,8 @@ const CITAS_PLAN = [
     ["Finalizada", 0, "Consulta y diagnóstico", 0, 7, "09:00"],
     ["Finalizada", 2, "Diseño de sonrisa", 1, 8, "08:30"],
     ["Finalizada", 1, "Ajuste de brackets", 0, 9, "15:00"],
+    ["Cancelada", 1, "Retiro de brackets y retenedor", 0, 10, "11:00"],
+    ["Cancelada", 2, "Blanqueamiento dental", 1, 11, "13:30"],
 ]
 
 const MOTIVOS_CANCELACION = [
@@ -314,12 +316,33 @@ async function main() {
     const restriccionesExistentes = await api("/restricciones-horario")
     const motivoExistente = new Set(restriccionesExistentes.map((r) => r.motivo))
 
+    // Dos restricciones se traslapan si sus alcances se cruzan (una es
+    // general o son del mismo empleado) y su horario coincide en la fecha.
+    function seTraslapaCon(a, b) {
+        if (a.fecha !== b.fecha) return false
+        const alcancesSeCruzan =
+            a.empleadoId == null || b.empleadoId == null || a.empleadoId === b.empleadoId
+        if (!alcancesSeCruzan) return false
+        if (a.todoElDia || b.todoElDia) return true
+        return a.horaInicio < b.horaFin && b.horaInicio < a.horaFin
+    }
+
     async function crearRestriccion({ tipo, motivo, fecha, empleadoCodigo = null, todoElDia = true, horaInicio = null, horaFin = null }) {
         if (motivoExistente.has(motivo)) return
         const tipoRestriccion = tipoPorNombre.get(tipo)
         if (!tipoRestriccion) throw new Error(`Tipo de restricción faltante: ${tipo}`)
         const empleado = empleadoCodigo ? empleadoPorCodigo.get(empleadoCodigo) : null
-        await api("/restricciones-horario", {
+
+        const nueva = { fecha, empleadoId: empleado?.id ?? null, todoElDia, horaInicio, horaFin }
+        const choca = [...restriccionesExistentes].find((r) => seTraslapaCon(nueva, r))
+        if (choca) {
+            console.warn(
+                `  ⚠ Restricción "${motivo}" omitida: se traslapa con "${choca.motivo}" (${fecha})`
+            )
+            motivoExistente.add(motivo)
+            return
+        }
+        const creada = await api("/restricciones-horario", {
             metodo: "POST",
             cuerpo: {
                 tipoRestriccionId: tipoRestriccion.id,
@@ -331,6 +354,8 @@ async function main() {
                 motivo,
             },
         })
+        // Registrarla también en memoria para detectar choques entre las nuevas
+        restriccionesExistentes.push({ ...creada, fecha, empleadoId: empleado?.id ?? null, todoElDia, horaInicio, horaFin })
         motivoExistente.add(motivo)
     }
 
