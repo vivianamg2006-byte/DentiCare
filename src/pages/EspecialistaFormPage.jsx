@@ -28,17 +28,26 @@ import { FormError } from "@/components/FormError"
 import { PageHeader } from "@/components/PageHeader"
 import { ErrorState } from "@/components/shared/ErrorState"
 import { MultiServiciosSelect } from "@/components/shared/MultiServiciosSelect"
-import { empleadoSchema, aPayloadEmpleado } from "@/schemas/empleadoSchema"
+import {
+    crearEspecialistaSchema,
+    editarEspecialistaSchema,
+    aPayloadEmpleado,
+    aPayloadNuevoUsuario,
+} from "@/schemas/empleadoSchema"
 import { listarEspecialidades } from "@/services/especialidadesService"
 import { listarServiciosActivos } from "@/services/serviciosService"
-import { listarEmpleados, crearEmpleado, obtenerEmpleado, actualizarEmpleado } from "@/services/empleadosService"
-import { listarUsuarios } from "@/services/authService"
-import { nombreCompleto } from "@/lib/format"
+import { crearEmpleado, obtenerEmpleado, actualizarEmpleado } from "@/services/empleadosService"
+import { crearUsuario } from "@/services/authService"
+import { listarRoles } from "@/services/rolesService"
 
 /**
  * Formulario compartido para crear o editar la ficha de un especialista.
  * Recibe `modo` ("crear" | "editar"); en edición toma el :id de la ruta,
- * precarga la ficha con sus tratamientos y valida todo con empleadoSchema.
+ * precarga la ficha con sus tratamientos y valida todo con los schemas.
+ *
+ * Al crear no se elige un usuario existente: se registra la cuenta nueva
+ * (nombre, correo, contraseña) junto con su rol, y el API la vincula a la
+ * ficha del especialista.
  */
 export function EspecialistaFormPage({ modo }) {
     // Cualquier modo distinto de "editar" se comporta como creación
@@ -46,7 +55,8 @@ export function EspecialistaFormPage({ modo }) {
     const { id } = useParams()
     const navigate = useNavigate()
 
-    const [usuariosDisponibles, setUsuariosDisponibles] = useState([])
+    const [roles, setRoles] = useState([])
+    const [rolSeleccionado, setRolSeleccionado] = useState("")
     const [especialidades, setEspecialidades] = useState([])
     const [servicios, setServicios] = useState([])
     const [servicioIds, setServicioIds] = useState([])
@@ -59,45 +69,58 @@ export function EspecialistaFormPage({ modo }) {
         control,
         reset,
         setValue,
+        watch,
         formState: { errors, isSubmitting },
     } = useForm({
-        resolver: zodResolver(empleadoSchema),
+        // En creación se valida también la cuenta nueva; en edición, la ficha
+        resolver: zodResolver(esEdicion ? editarEspecialistaSchema : crearEspecialistaSchema),
         defaultValues: {
             usuarioId: "",
+            nombre: "",
+            primerApellido: "",
+            segundoApellido: "",
+            correo: "",
+            telefono: "",
+            password: "",
+            confirmPassword: "",
             especialidadId: "",
             codigoEmpleado: "",
             descripcion: "",
         },
     })
 
-    // Carga inicial en paralelo: catálogos + usuarios sin ficha (y la ficha actual si editamos)
+    // El API rechaza fichas con tratamientos de otra especialidad
+    // ("Los siguientes servicios no pertenecen a la especialidad seleccionada"),
+    // así que el multiselect solo ofrece servicios de la especialidad elegida.
+    const especialidadIdActual = watch("especialidadId")
+    const serviciosFiltrados = useMemo(
+        () =>
+            especialidadIdActual
+                ? servicios.filter((s) => String(s.especialidadId) === especialidadIdActual)
+                : servicios,
+        [servicios, especialidadIdActual]
+    )
+
+    // Carga inicial en paralelo: catálogos (y la ficha actual si editamos)
     useEffect(() => {
         // Bandera anti-carrera: si el componente se desmonta, ignoramos toda respuesta
         let activo = true
         async function cargar() {
             try {
-                const [listaUsuarios, listaEspecialidades, listaServicios, listaEmpleados] =
-                    await Promise.all([
-                        listarUsuarios("Empleado"),
-                        listarEspecialidades(),
-                        listarServiciosActivos(),
-                        listarEmpleados(),
-                    ])
+                const [listaEspecialidades, listaServicios, listaRoles] = await Promise.all([
+                    listarEspecialidades(),
+                    listarServiciosActivos(),
+                    listarRoles(),
+                ])
                 if (!activo) return
 
                 setEspecialidades(listaEspecialidades.filter((e) => e.activo))
                 setServicios(listaServicios)
-
-                // Usuarios con rol Empleado que aún no tienen ficha asignada
-                const usuariosConFicha = new Set(
-                    listaEmpleados
-                        .filter((e) => (esEdicion ? e.id !== Number(id) : true))
-                        .map((e) => e.usuarioId)
-                )
-                const disponibles = listaUsuarios.filter(
-                    (u) => u.activo && !usuariosConFicha.has(u.id)
-                )
-                setUsuariosDisponibles(disponibles)
+                // Catálogo de roles para el combo; Empleado queda preseleccionado
+                const rolesActivos = listaRoles.filter((r) => r.activo)
+                setRoles(rolesActivos)
+                const rolEmpleado = rolesActivos.find((r) => r.nombre === "Empleado")
+                setRolSeleccionado(String(rolEmpleado?.id ?? rolesActivos[0]?.id ?? ""))
 
                 if (esEdicion) {
                     const empleado = await obtenerEmpleado(id)
@@ -109,12 +132,6 @@ export function EspecialistaFormPage({ modo }) {
                         descripcion: empleado.descripcion ?? "",
                     })
                     setServicioIds(empleado.servicios?.map((s) => s.id) ?? [])
-                    // En edición, incluir también el usuario ya asignado
-                    setUsuariosDisponibles((prev) =>
-                        prev.some((u) => u.id === empleado.usuarioId)
-                            ? prev
-                            : [empleado.usuario, ...prev]
-                    )
                 }
             } catch (e) {
                 if (activo) setErrorCarga(e.message)
@@ -148,7 +165,12 @@ export function EspecialistaFormPage({ modo }) {
                 await actualizarEmpleado(id, aPayloadEmpleado(data))
                 toast.success("Especialista actualizado correctamente.")
             } else {
-                await crearEmpleado(aPayloadEmpleado(data))
+                if (!rolSeleccionado) {
+                    throw new Error("Debe seleccionar el rol del nuevo usuario.")
+                }
+                // 1) Alta de la cuenta con el rol elegido; 2) ficha vinculada a ella
+                const nuevoUsuario = await crearUsuario(aPayloadNuevoUsuario(data, rolSeleccionado))
+                await crearEmpleado(aPayloadEmpleado({ ...data, usuarioId: nuevoUsuario.id }))
                 toast.success("Especialista creado correctamente.")
             }
             navigate("/especialistas")
@@ -167,7 +189,7 @@ export function EspecialistaFormPage({ modo }) {
                 description={
                     esEdicion
                         ? "Modifique la ficha del especialista y sus tratamientos."
-                        : "Registre la ficha de un nuevo odontólogo o higienista."
+                        : "Registre la cuenta y la ficha de un nuevo odontólogo o higienista."
                 }
             />
 
@@ -178,42 +200,131 @@ export function EspecialistaFormPage({ modo }) {
                 </CardHeader>
                 <CardContent>
                     <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-5">
-                        <div className="grid gap-4 sm:grid-cols-2">
-                            <div className="grid gap-2">
-                                <Label>Usuario (rol Empleado) *</Label>
-                                <Controller
-                                    control={control}
-                                    name="usuarioId"
-                                    render={({ field }) => (
-                                        <Select value={String(field.value ?? "")} onValueChange={field.onChange}>
-                                            <SelectTrigger className="w-full">
-                                                <SelectValue placeholder="Seleccione un usuario…" />
+                        {/* Cuenta nueva: solo al crear. Grilla responsiva:
+                            una columna en móvil y dos desde sm. */}
+                        {!esEdicion && (
+                            <>
+                                <div className="grid gap-4 sm:grid-cols-2">
+                                    <div className="grid gap-2">
+                                        <Label htmlFor="rol">Rol *</Label>
+                                        <Select value={rolSeleccionado} onValueChange={setRolSeleccionado}>
+                                            <SelectTrigger id="rol" className="w-full">
+                                                <SelectValue placeholder="Seleccione un rol…" />
                                             </SelectTrigger>
                                             <SelectContent>
-                                                {usuariosDisponibles.length === 0 && (
-                                                    <div className="px-3 py-2 text-sm text-muted-foreground">
-                                                        No hay usuarios Empleado disponibles sin ficha.
-                                                    </div>
-                                                )}
-                                                {usuariosDisponibles.map((u) => (
-                                                    <SelectItem key={u.id} value={String(u.id)}>
-                                                        {nombreCompleto(u)} ({u.correo})
+                                                {roles.map((r) => (
+                                                    <SelectItem key={r.id} value={String(r.id)}>
+                                                        {r.nombre}
                                                     </SelectItem>
                                                 ))}
                                             </SelectContent>
                                         </Select>
-                                    )}
-                                />
-                                <FormError message={errors.usuarioId?.message} />
-                            </div>
+                                        <p className="text-xs text-muted-foreground">
+                                            El especialista suele ser Empleado.
+                                        </p>
+                                    </div>
+                                    <div className="grid gap-2">
+                                        <Label htmlFor="correo">Correo electrónico *</Label>
+                                        <Input
+                                            id="correo"
+                                            type="email"
+                                            placeholder="ana.rojas@dentcare.com"
+                                            autoComplete="off"
+                                            {...register("correo")}
+                                        />
+                                        <FormError message={errors.correo?.message} />
+                                    </div>
+                                    <div className="grid gap-2">
+                                        <Label htmlFor="nombre">Nombre *</Label>
+                                        <Input id="nombre" placeholder="Ana" {...register("nombre")} />
+                                        <FormError message={errors.nombre?.message} />
+                                    </div>
+                                    <div className="grid gap-2">
+                                        <Label htmlFor="primerApellido">Primer apellido *</Label>
+                                        <Input
+                                            id="primerApellido"
+                                            placeholder="Rojas"
+                                            {...register("primerApellido")}
+                                        />
+                                        <FormError message={errors.primerApellido?.message} />
+                                    </div>
+                                    <div className="grid gap-2">
+                                        <Label htmlFor="segundoApellido">Segundo apellido (opcional)</Label>
+                                        <Input
+                                            id="segundoApellido"
+                                            placeholder="Mora"
+                                            {...register("segundoApellido")}
+                                        />
+                                        <FormError message={errors.segundoApellido?.message} />
+                                    </div>
+                                    <div className="grid gap-2">
+                                        <Label htmlFor="telefono">Teléfono (opcional)</Label>
+                                        <Input
+                                            id="telefono"
+                                            placeholder="8888-8888"
+                                            {...register("telefono")}
+                                        />
+                                        <FormError message={errors.telefono?.message} />
+                                    </div>
+                                </div>
 
+                                {/* Credenciales en bloque propio para alinear password + confirmación */}
+                                <div className="grid gap-4 rounded-lg border border-border/70 bg-muted/30 p-4">
+                                    <div className="grid gap-4 sm:grid-cols-2">
+                                        <div className="grid content-start gap-2">
+                                            <Label htmlFor="password">Contraseña *</Label>
+                                            <Input
+                                                id="password"
+                                                type="password"
+                                                autoComplete="new-password"
+                                                {...register("password")}
+                                            />
+                                            <FormError message={errors.password?.message} />
+                                        </div>
+                                        <div className="grid content-start gap-2">
+                                            <Label htmlFor="confirmPassword">Confirmar contraseña *</Label>
+                                            <Input
+                                                id="confirmPassword"
+                                                type="password"
+                                                autoComplete="new-password"
+                                                {...register("confirmPassword")}
+                                            />
+                                            <FormError message={errors.confirmPassword?.message} />
+                                        </div>
+                                    </div>
+                                    <p className="text-xs text-muted-foreground">
+                                        La contraseña debe tener mínimo 8 caracteres, incluyendo al menos
+                                        una letra mayúscula, una minúscula y un número.
+                                    </p>
+                                </div>
+                            </>
+                        )}
+
+                        <div className="grid gap-4 sm:grid-cols-2">
                             <div className="grid gap-2">
                                 <Label>Especialidad *</Label>
                                 <Controller
                                     control={control}
                                     name="especialidadId"
                                     render={({ field }) => (
-                                        <Select value={String(field.value ?? "")} onValueChange={field.onChange}>
+                                        <Select
+                                            value={String(field.value ?? "")}
+                                            onValueChange={(valor) => {
+                                                field.onChange(valor)
+                                                // Al cambiar la especialidad, los tratamientos
+                                                // marcados de la anterior ya no son válidos para
+                                                // el API: se limpian de la selección.
+                                                setServicioIds((prev) =>
+                                                    prev.filter((idSeleccionado) =>
+                                                        servicios.some(
+                                                            (s) =>
+                                                                s.id === idSeleccionado &&
+                                                                String(s.especialidadId) === valor
+                                                        )
+                                                    )
+                                                )
+                                            }}
+                                        >
                                             <SelectTrigger className="w-full">
                                                 <SelectValue placeholder="Seleccione una especialidad…" />
                                             </SelectTrigger>
@@ -229,9 +340,6 @@ export function EspecialistaFormPage({ modo }) {
                                 />
                                 <FormError message={errors.especialidadId?.message} />
                             </div>
-                        </div>
-
-                        <div className="grid gap-4 sm:grid-cols-2">
                             <div className="grid gap-2">
                                 <Label htmlFor="codigoEmpleado">Código de empleado *</Label>
                                 <Input
@@ -244,22 +352,23 @@ export function EspecialistaFormPage({ modo }) {
                                 </p>
                                 <FormError message={errors.codigoEmpleado?.message} />
                             </div>
-                            <div className="grid gap-2">
-                                <Label htmlFor="descripcion">Descripción (opcional)</Label>
-                                <Textarea
-                                    id="descripcion"
-                                    rows={3}
-                                    placeholder="Odontólogo general con 10 años de experiencia…"
-                                    {...register("descripcion")}
-                                />
-                                <FormError message={errors.descripcion?.message} />
-                            </div>
+                        </div>
+
+                        <div className="grid gap-2">
+                            <Label htmlFor="descripcion">Descripción (opcional)</Label>
+                            <Textarea
+                                id="descripcion"
+                                rows={3}
+                                placeholder="Odontólogo general con 10 años de experiencia…"
+                                {...register("descripcion")}
+                            />
+                            <FormError message={errors.descripcion?.message} />
                         </div>
 
                         <div className="grid gap-2">
                             <Label>Tratamientos que atiende *</Label>
                             <MultiServiciosSelect
-                                servicios={servicios}
+                                servicios={serviciosFiltrados}
                                 seleccionados={servicioIds}
                                 onChange={setServicioIds}
                             />

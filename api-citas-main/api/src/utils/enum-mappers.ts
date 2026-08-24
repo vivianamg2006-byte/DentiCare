@@ -1,22 +1,20 @@
-import { EstadoOrden, Role } from "../../generated/prisma";
-
 export interface EnumOption {
     value: string;
     label: string;
 }
 
 //Estado de las Órdenes
-export const EstadoOrdenMap: Record<EstadoOrden, string> = {
-    [EstadoOrden.PENDIENTE]: "Pendiente de Pago",
-    [EstadoOrden.PAGADA]: "Pagada",
-    [EstadoOrden.ENVIADA]: "Enviada",
-    [EstadoOrden.CANCELADA]: "Cancelada"
+export const EstadoOrdenMap: Record<string, string> = {
+    PENDIENTE: "Pendiente de Pago",
+    PAGADA: "Pagada",
+    ENVIADA: "Enviada",
+    CANCELADA: "Cancelada"
 };
 
 // Roles
-export const RoleMap: Record<Role, string> = {
-    [Role.USER]: "Cliente",
-    [Role.ADMIN]: "Administrador"
+export const RoleMap: Record<string, string> = {
+    USER: "Cliente",
+    ADMIN: "Administrador"
 };
 
 /**

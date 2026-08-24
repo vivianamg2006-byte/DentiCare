@@ -51,6 +51,29 @@ export function listarUsuarios(rol) {
 }
 
 /**
+ * Crea un usuario con el rol indicado (uso del Administrador).
+ *
+ * @param {object} payload - Datos del usuario (incluye rolId y password).
+ * @returns {Promise<object>} Usuario creado (sin passwordHash).
+ */
+export function crearUsuario(payload) {
+    return request("/usuarios", { method: "POST", body: payload })
+}
+
+/**
+ * Modifica los datos editables de un usuario, incluido su rol.
+ * PUT exige el objeto completo: nombre, apellidos, correo,
+ * telefono y rolId.
+ *
+ * @param {number|string} id
+ * @param {object} payload - Datos completos del usuario con el nuevo rolId.
+ * @returns {Promise<object>} Usuario actualizado.
+ */
+export function actualizarUsuario(id, payload) {
+    return request(`/usuarios/${id}`, { method: "PUT", body: payload })
+}
+
+/**
  * Obtiene un usuario puntual por su id.
  *
  * @param {number|string} id

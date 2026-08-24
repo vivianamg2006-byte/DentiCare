@@ -99,6 +99,58 @@ export class UsuarioController {
             next(error);
         }
     };
+    crear = async (
+        request: Request,
+        response: Response,
+        next: NextFunction
+    ) => {
+        try {
+            const usuario =
+                await usuarioService.crear(
+                    request.body
+                );
+            return sendSuccess(
+                response,
+                usuario,
+                "Usuario creado correctamente",
+                StatusCodes.CREATED
+            );
+        } catch (error) {
+            const message =
+                error instanceof Error
+                    ? error.message
+                    : "";
+            if (
+                message ===
+                "El correo ya está registrado"
+            ) {
+                return response
+                    .status(
+                        StatusCodes.CONFLICT
+                    )
+                    .json({
+                        success: false,
+                        message,
+                    });
+            }
+            if (
+                message ===
+                    "El rol indicado no existe" ||
+                message ===
+                    "El rol indicado se encuentra inactivo"
+            ) {
+                return response
+                    .status(
+                        StatusCodes.BAD_REQUEST
+                    )
+                    .json({
+                        success: false,
+                        message,
+                    });
+            }
+            next(error);
+        }
+    };
     login = async (
         request: Request,
         response: Response,

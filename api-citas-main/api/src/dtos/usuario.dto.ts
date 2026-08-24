@@ -70,6 +70,33 @@ export const registerClienteSchema = z
     })
     .strict();
 
+/**
+ * Creación de usuarios por parte del Administrador.
+ * A diferencia del registro público, aquí sí se indica el rol
+ * (ej.: Empleado para luego crearle la ficha de especialista).
+ */
+export const crearUsuarioSchema = z
+    .object({
+        nombre: nombrePersonaSchema,
+
+        primerApellido: nombrePersonaSchema,
+
+        segundoApellido: segundoApellidoSchema
+            .optional()
+            .default(null),
+
+        correo: emailSchema,
+
+        telefono: telefonoSchema
+            .optional()
+            .default(null),
+
+        password: passwordSchema,
+
+        rolId: idSchema,
+    })
+    .strict();
+
 export const loginSchema = z
     .object({
         correo: emailSchema,
@@ -101,6 +128,10 @@ export const updateUsuarioSchema = z
 
 export type RegisterClienteDto = z.infer<
     typeof registerClienteSchema
+>;
+
+export type CrearUsuarioDto = z.infer<
+    typeof crearUsuarioSchema
 >;
 
 export type LoginDto = z.infer<

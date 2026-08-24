@@ -8,6 +8,7 @@ import {
     LoginDto,
     RegisterClienteDto,
     UpdateUsuarioDto,
+    CrearUsuarioDto,
 } from "../dtos/usuario.dto";
 
 /**
@@ -146,6 +147,71 @@ export const usuarioService = {
                 telefono: data.telefono,
                 passwordHash,
                 rolId: rolCliente.id,
+                activo: true,
+            },
+            omit: usuarioOmit,
+            include: {
+                rol: true,
+            },
+        });
+    },
+    /**
+     * Crea un usuario con el rol indicado (uso del Administrador).
+     * Permite dar de alta usuarios Empleado antes de crear su ficha.
+     */
+    async crear(data: CrearUsuarioDto) {
+        const correoNormalizado =
+            data.correo.toLowerCase();
+        const usuarioExiste =
+            await prisma.usuario.findUnique({
+                where: {
+                    correo: correoNormalizado,
+                },
+                select: {
+                    id: true,
+                },
+            });
+        if (usuarioExiste) {
+            throw new Error(
+                "El correo ya está registrado"
+            );
+        }
+        const rol =
+            await prisma.rol.findUnique({
+                where: {
+                    id: data.rolId,
+                },
+                select: {
+                    id: true,
+                    activo: true,
+                },
+            });
+        if (!rol) {
+            throw new Error(
+                "El rol indicado no existe"
+            );
+        }
+        if (!rol.activo) {
+            throw new Error(
+                "El rol indicado se encuentra inactivo"
+            );
+        }
+        const passwordHash =
+            await bcrypt.hash(
+                data.password,
+                10
+            );
+        return await prisma.usuario.create({
+            data: {
+                nombre: data.nombre,
+                primerApellido:
+                    data.primerApellido,
+                segundoApellido:
+                    data.segundoApellido,
+                correo: correoNormalizado,
+                telefono: data.telefono,
+                passwordHash,
+                rolId: rol.id,
                 activo: true,
             },
             omit: usuarioOmit,

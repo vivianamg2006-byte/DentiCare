@@ -58,7 +58,7 @@ export function CitaFormPage({ modo }) {
     const esEdicion = modo === "editar"
     const { id } = useParams()
     const navigate = useNavigate()
-    const { user } = useAuth()
+    const { user, rol, empleadoId } = useAuth()
 
     // Catálogos
     const [pacientes, setPacientes] = useState([])
@@ -292,9 +292,19 @@ export function CitaFormPage({ modo }) {
                     estadoCitaId: estadoPendiente?.id ?? 1,
                     creadoPorUsuarioId: user.id,
                 })
-                toast.success("Cita registrada correctamente.")
-                // Confirmación inmediata: el detalle muestra todos los datos guardados
-                navigate(`/citas/${creada.id}`)
+                // Regla del enunciado: un Empleado solo consulta el detalle de
+                // sus citas asignadas. Si la acaba de crear para OTRO especialista,
+                // navegar al detalle lo mandaría a /unauthorized; se lleva al
+                // listado con la confirmación de éxito.
+                const asignadaAOtro = rol === "Empleado" && Number(data.empleadoId) !== Number(empleadoId)
+                if (asignadaAOtro) {
+                    toast.success("Cita registrada correctamente para otro especialista.")
+                    navigate("/citas", { replace: true })
+                } else {
+                    toast.success("Cita registrada correctamente.")
+                    // Confirmación inmediata: el detalle muestra todos los datos guardados
+                    navigate(`/citas/${creada.id}`)
+                }
             }
         } catch (e) {
             toast.error(e.message || "No se pudo guardar la cita.")

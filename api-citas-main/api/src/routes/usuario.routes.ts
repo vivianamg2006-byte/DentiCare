@@ -6,6 +6,7 @@ import {
     registerClienteSchema,
     loginSchema,
     updateUsuarioSchema,
+    crearUsuarioSchema,
 } from "../dtos/usuario.dto";
 
 import { authenticateToken } from "../middlewares/auth.middleware";
@@ -457,6 +458,104 @@ export class UsuarioRoutes {
             "/perfil",
             authenticateToken,
             asyncHandler(controller.perfil)
+        );
+        /**
+         * @swagger
+         * /usuarios:
+         *   post:
+         *     summary: Crear un usuario con rol específico (Administrador)
+         *     description: >
+         *       Crea un usuario indicando el rol deseado mediante rolId.
+         *       Se utiliza, por ejemplo, para dar de alta un usuario Empleado
+         *       antes de registrarle la ficha de especialista. El usuario se
+         *       crea siempre activo.
+         *     tags:
+         *       - Usuarios
+         *     requestBody:
+         *       required: true
+         *       content:
+         *         application/json:
+         *           schema:
+         *             type: object
+         *             additionalProperties: false
+         *             required:
+         *               - nombre
+         *               - primerApellido
+         *               - correo
+         *               - password
+         *               - rolId
+         *             properties:
+         *               nombre:
+         *                 type: string
+         *                 minLength: 2
+         *                 maxLength: 100
+         *                 example: Carlos
+         *               primerApellido:
+         *                 type: string
+         *                 minLength: 2
+         *                 maxLength: 100
+         *                 example: Mora
+         *               segundoApellido:
+         *                 type: string
+         *                 nullable: true
+         *                 minLength: 2
+         *                 maxLength: 100
+         *                 example: Vargas
+         *               correo:
+         *                 type: string
+         *                 format: email
+         *                 maxLength: 150
+         *                 example: carlos.mora@dentcare.com
+         *               telefono:
+         *                 type: string
+         *                 nullable: true
+         *                 minLength: 8
+         *                 maxLength: 25
+         *                 pattern: '^[0-9+\-()\s]+$'
+         *                 example: "87123456"
+         *               password:
+         *                 type: string
+         *                 format: password
+         *                 minLength: 8
+         *                 maxLength: 100
+         *                 description: Debe incluir mayúscula, minúscula y número.
+         *                 example: Odonto123
+         *               rolId:
+         *                 type: integer
+         *                 minimum: 1
+         *                 example: 2
+         *     responses:
+         *       201:
+         *         description: Usuario creado correctamente
+         *         content:
+         *           application/json:
+         *             schema:
+         *               $ref: '#/components/schemas/UsuarioSuccessResponse'
+         *       400:
+         *         description: Datos inválidos o rol inexistente/inactivo
+         *         content:
+         *           application/json:
+         *             schema:
+         *               oneOf:
+         *                 - $ref: '#/components/schemas/ValidationErrorResponse'
+         *                 - $ref: '#/components/schemas/ErrorResponse'
+         *       409:
+         *         description: El correo ya está registrado
+         *         content:
+         *           application/json:
+         *             schema:
+         *               $ref: '#/components/schemas/ErrorResponse'
+         *       500:
+         *         description: Error interno del servidor
+         *         content:
+         *           application/json:
+         *             schema:
+         *               $ref: '#/components/schemas/ErrorResponse'
+         */
+        router.post(
+            "/",
+            validateRequest(crearUsuarioSchema),
+            asyncHandler(controller.crear)
         );
         /**
          * @swagger
