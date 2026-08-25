@@ -41,6 +41,7 @@ export function CitaDetailPage() {
     const { rol, empleadoId, user } = useAuth()
     const isAdmin = rol === "Administrador"
     const isEmpleado = rol === "Empleado"
+    const isCliente = rol === "Cliente"
 
     const [cita, setCita] = useState(null)
     const [estados, setEstados] = useState([])
@@ -96,10 +97,16 @@ export function CitaDetailPage() {
     const esAsignada = isEmpleado && cita.empleadoId === empleadoId
     const puedeGestionar = isAdmin || esAsignada
 
+    // Regla del enunciado para el Cliente: cita propia + estado Pendiente.
+    // El estado se identifica por su nombre (cita.estadoCita.nombre), nunca
+    // por id numérico.
+    const esCitaPropia = isCliente && cita.clienteId === user.id
+    const esPendiente = cita.estadoCita?.nombre === "Pendiente"
+
     function puedeCancelar() {
         if (!cita.estadoCita) return false
-        if (rol === "Cliente") {
-            return Boolean(cita.estadoCita.permiteCancelacionCliente)
+        if (isCliente) {
+            return esCitaPropia && esPendiente
         }
         return puedeGestionar
     }

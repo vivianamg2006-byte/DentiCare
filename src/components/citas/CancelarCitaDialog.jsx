@@ -17,16 +17,19 @@ import { Label } from "@/components/ui/label"
 import { FormError } from "@/components/FormError"
 import { cancelarCitaSchema } from "@/schemas/citaSchema"
 import { cancelarCita } from "@/services/citasService"
+import { useAuth } from "@/auth/useAuth"
 
 /**
  * Diálogo para cancelar una cita con motivo obligatorio
  * (5 a 255 caracteres, igual que el DTO del API).
  *
- * El cliente solo puede cancelar si el estado actual lo permite
- * (`permiteCancelacionCliente`); administradores y empleados
+ * Revalidación de seguridad antes de llamar al API (no basta con que el
+ * botón esté oculto): un Cliente solo puede cancelar SUS propias citas y
+ * únicamente cuando están en estado Pendiente; administradores y empleados
  * asignados pueden cancelar siempre que el estado no lo bloquee.
  */
 export function CancelarCitaDialog({ open, onOpenChange, cita, onConfirmada }) {
+    const { rol, user } = useAuth()
     const {
         register,
         handleSubmit,
@@ -40,6 +43,19 @@ export function CancelarCitaDialog({ open, onOpenChange, cita, onConfirmada }) {
     if (!cita) return null
 
     async function onSubmit(data) {
+        // Doble verificación de permisos: si alguna regla no se cumple,
+        // NO se ejecuta la solicitud al API.
+        if (rol === "Cliente") {
+            const esPropia = cita.clienteId === user.id
+            const esPendiente = cita.estadoCita?.nombre === "Pendiente"
+            if (!esPropia || !esPendiente) {
+                toast.error(
+                    "Solo puede cancelar sus propias citas cuando están en estado Pendiente."
+                )
+                onOpenChange(false)
+                return
+            }
+        }
         try {
             await cancelarCita(cita.id, data.motivoCancelacion.trim())
             toast.success("La cita fue cancelada correctamente.")
@@ -57,9 +73,9 @@ export function CancelarCitaDialog({ open, onOpenChange, cita, onConfirmada }) {
                 <DialogHeader>
                     <DialogTitle>Cancelar cita</DialogTitle>
                     <DialogDescription>
-                        Indique el motivo de cancelación de la cita del{" "}
-                        {String(cita.fecha).slice(0, 10)} a las {cita.horaInicio}. Este motivo
-                        quedará registrado en el sistema.
+                        ¿Está seguro de que desea cancelar esta cita? Esta acción no se puede
+                        deshacer. Indique el motivo de la cita del {String(cita.fecha).slice(0, 10)}{" "}
+                        a las {cita.horaInicio}; quedará registrado en el sistema.
                     </DialogDescription>
                 </DialogHeader>
                 <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-3">
@@ -78,7 +94,7 @@ export function CancelarCitaDialog({ open, onOpenChange, cita, onConfirmada }) {
                             Volver
                         </Button>
                         <Button type="submit" variant="destructive" disabled={isSubmitting}>
-                            {isSubmitting ? "Cancelando…" : "Confirmar cancelación"}
+                            {isSubmitting ? "Cancelando…" : "Cancelar cita"}
                         </Button>
                     </DialogFooter>
                 </form>

@@ -116,7 +116,11 @@ export function CitasPage() {
 
     function puedeCancelar(cita) {
         if (isCliente) {
-            return Boolean(cita.estadoCita?.permiteCancelacionCliente)
+            // Enunciado: el Cliente solo cancela SUS citas y solo en estado
+            // Pendiente (identificado por nombre, nunca por id numérico).
+            // El listado ya es exclusivo suyo (listarCitasCliente), pero la
+            // propiedad se verifica de forma explícita.
+            return cita.clienteId === user?.id && cita.estadoCita?.nombre === "Pendiente"
         }
         // Administrador y Empleado: el API valida según el estado
         return true

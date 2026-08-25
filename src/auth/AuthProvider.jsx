@@ -129,6 +129,9 @@ export function AuthProvider({ children }) {
             isAuthenticated,
             rol: user?.rol?.nombre ?? null,
             empleadoId: user?.empleado?.id ?? null,
+            // Derivado para las pantallas de gestión (tratamientos,
+            // especialistas, adicionales): solo true con rol Administrador.
+            isAdmin: user?.rol?.nombre === "Administrador",
             login,
             logout,
             registerUser,
