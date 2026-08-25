@@ -21,6 +21,8 @@ const PASO_MINUTOS = 30
  * Un bloque solo es seleccionable si toda la duración del
  * tratamiento cabe sin traslapar citas ni restricciones y sin
  * pasar del cierre de la clínica.
+ * 
+ * HORAS
  */
 export function SlotGrid({
     fecha,
