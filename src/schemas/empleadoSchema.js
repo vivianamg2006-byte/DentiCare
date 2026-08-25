@@ -6,8 +6,8 @@ import { z } from "zod"
  * Ojo: los selects entregan strings, por eso los ids usan z.coerce.
  *
  * En creación ya no se elige un usuario existente: el especialista se da
- * de alto junto con su cuenta nueva, cuyo rol se escoge en el formulario
- * (Administrador, Empleado o Cliente). En edición solo se modifica la ficha.
+ * de alta junto con su cuenta nueva, cuyo rol es siempre "Empleado"
+ * (resuelto dinámicamente desde el API). En edición solo se modifica la ficha.
  */
 
 // Reglas compartidas con registroSchema para los datos de la cuenta nueva
@@ -64,7 +64,7 @@ const camposFicha = {
 
 /**
  * Alta de especialista: crea primero la cuenta del usuario (POST /usuarios)
- * con el rol seleccionado y luego su ficha (POST /empleados).
+ * con el rol "Empleado" y luego su ficha (POST /empleados).
  */
 export const crearEspecialistaSchema = z
     .object({
@@ -138,7 +138,7 @@ export function aPayloadEmpleado(data) {
  * Arma el payload del endpoint POST /usuarios para la cuenta nueva.
  *
  * @param {Object} data Datos ya validados por crearEspecialistaSchema.
- * @param {number|string} rolId Id del rol elegido en el combo.
+ * @param {number|string} rolId Id del rol "Empleado" resuelto desde el API (listarRoles).
  */
 export function aPayloadNuevoUsuario(data, rolId) {
     return {

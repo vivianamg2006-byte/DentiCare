@@ -46,8 +46,8 @@ import { listarRoles } from "@/services/rolesService"
  * precarga la ficha con sus tratamientos y valida todo con los schemas.
  *
  * Al crear no se elige un usuario existente: se registra la cuenta nueva
- * (nombre, correo, contraseña) junto con su rol, y el API la vincula a la
- * ficha del especialista.
+ * (nombre, correo, contraseña) siempre con el rol "Empleado" resuelto del
+ * API, y luego se vincula a la ficha del especialista.
  */
 export function EspecialistaFormPage({ modo }) {
     // Cualquier modo distinto de "editar" se comporta como creación
@@ -55,8 +55,9 @@ export function EspecialistaFormPage({ modo }) {
     const { id } = useParams()
     const navigate = useNavigate()
 
-    const [roles, setRoles] = useState([])
-    const [rolSeleccionado, setRolSeleccionado] = useState("")
+    // Id del rol "Empleado" resuelto desde el API; el especialista siempre
+    // se crea con este rol (no es seleccionable en el formulario).
+    const [rolEmpleadoId, setRolEmpleadoId] = useState(null)
     const [especialidades, setEspecialidades] = useState([])
     const [servicios, setServicios] = useState([])
     const [servicioIds, setServicioIds] = useState([])
@@ -116,11 +117,11 @@ export function EspecialistaFormPage({ modo }) {
 
                 setEspecialidades(listaEspecialidades.filter((e) => e.activo))
                 setServicios(listaServicios)
-                // Catálogo de roles para el combo; Empleado queda preseleccionado
-                const rolesActivos = listaRoles.filter((r) => r.activo)
-                setRoles(rolesActivos)
-                const rolEmpleado = rolesActivos.find((r) => r.nombre === "Empleado")
-                setRolSeleccionado(String(rolEmpleado?.id ?? rolesActivos[0]?.id ?? ""))
+                // El rol de la cuenta nueva no se elige: se resuelve el rol
+                // "Empleado" del catálogo (si no existe, se bloquea la creación
+                // en onSubmit con un mensaje claro).
+                const rolEmpleado = listaRoles.find((r) => r.activo && r.nombre === "Empleado")
+                setRolEmpleadoId(rolEmpleado?.id ?? null)
 
                 if (esEdicion) {
                     const empleado = await obtenerEmpleado(id)
@@ -165,11 +166,15 @@ export function EspecialistaFormPage({ modo }) {
                 await actualizarEmpleado(id, aPayloadEmpleado(data))
                 toast.success("Especialista actualizado correctamente.")
             } else {
-                if (!rolSeleccionado) {
-                    throw new Error("Debe seleccionar el rol del nuevo usuario.")
+                // Sin el rol "Empleado" no se puede garantizar la consistencia
+                // usuario/ficha: se aborta la creación con un mensaje claro.
+                if (!rolEmpleadoId) {
+                    throw new Error(
+                        "No se encontró el rol Empleado. No es posible registrar el especialista."
+                    )
                 }
-                // 1) Alta de la cuenta con el rol elegido; 2) ficha vinculada a ella
-                const nuevoUsuario = await crearUsuario(aPayloadNuevoUsuario(data, rolSeleccionado))
+                // 1) Alta de la cuenta con el rol Empleado; 2) ficha vinculada a ella
+                const nuevoUsuario = await crearUsuario(aPayloadNuevoUsuario(data, rolEmpleadoId))
                 await crearEmpleado(aPayloadEmpleado({ ...data, usuarioId: nuevoUsuario.id }))
                 toast.success("Especialista creado correctamente.")
             }
@@ -205,24 +210,6 @@ export function EspecialistaFormPage({ modo }) {
                         {!esEdicion && (
                             <>
                                 <div className="grid gap-4 sm:grid-cols-2">
-                                    <div className="grid gap-2">
-                                        <Label htmlFor="rol">Rol *</Label>
-                                        <Select value={rolSeleccionado} onValueChange={setRolSeleccionado}>
-                                            <SelectTrigger id="rol" className="w-full">
-                                                <SelectValue placeholder="Seleccione un rol…" />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                {roles.map((r) => (
-                                                    <SelectItem key={r.id} value={String(r.id)}>
-                                                        {r.nombre}
-                                                    </SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                        <p className="text-xs text-muted-foreground">
-                                            El especialista suele ser Empleado.
-                                        </p>
-                                    </div>
                                     <div className="grid gap-2">
                                         <Label htmlFor="correo">Correo electrónico *</Label>
                                         <Input
